@@ -1,0 +1,94 @@
+name: Build and Release
+
+# Builds the Windows executable (installer) and publishes it.
+#
+# - On a version tag push (e.g. v1.0.0): builds and creates a GitHub Release
+#   with the installer attached.
+# - On manual run (workflow_dispatch): builds and uploads the installer as a
+#   workflow artifact you can download from the run page.
+#
+# Prerequisite: add a repository secret named NDI_SDK_URL containing a direct
+# download link to the "NDI 6 SDK" Windows installer (.exe). The native addon
+# is compiled against this SDK. See README ("Continuous builds / Releases").
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install NDI SDK
+        shell: pwsh
+        run: |
+          $url = "${{ secrets.NDI_SDK_URL }}"
+          if ([string]::IsNullOrWhiteSpace($url)) {
+            Write-Error "Repository secret 'NDI_SDK_URL' is not set. Add a direct download URL to the NDI 6 SDK Windows installer (.exe)."
+            exit 1
+          }
+          $installer = Join-Path $env:RUNNER_TEMP "ndi-sdk.exe"
+          Write-Host "Downloading NDI SDK installer..."
+          Invoke-WebRequest -Uri $url -OutFile $installer
+
+          Write-Host "Running silent install..."
+          Start-Process -FilePath $installer -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-' -Wait
+
+          # Locate the installed SDK (default: C:\Program Files\NDI\NDI 6 SDK).
+          $sdk = "C:\Program Files\NDI\NDI 6 SDK"
+          if (-not (Test-Path (Join-Path $sdk "Include\Processing.NDI.Lib.h"))) {
+            Write-Host "Default path not found, searching for the SDK..."
+            $hdr = Get-ChildItem "C:\Program Files\NDI" -Recurse -Filter "Processing.NDI.Lib.h" -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($hdr) { $sdk = Split-Path (Split-Path $hdr.FullName -Parent) -Parent }
+          }
+          if (-not (Test-Path (Join-Path $sdk "Include\Processing.NDI.Lib.h"))) {
+            Write-Error "NDI SDK headers were not found after installation. Check that NDI_SDK_URL points to the NDI 6 SDK installer."
+            exit 1
+          }
+          Write-Host "NDI_SDK_DIR=$sdk"
+          "NDI_SDK_DIR=$sdk" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Install dependencies and build native addon
+        run: npm ci
+        env:
+          NDI_SDK_DIR: ${{ env.NDI_SDK_DIR }}
+
+      - name: Package Windows executable
+        run: npm run dist
+        env:
+          NDI_SDK_DIR: ${{ env.NDI_SDK_DIR }}
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HTMLtoNDI-windows
+          path: |
+            dist/*.exe
+            dist/*.blockmap
+            dist/latest.yml
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.exe
+            dist/*.blockmap
+            dist/latest.yml
+          generate_release_notes: true

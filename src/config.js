@@ -5,12 +5,12 @@
 //   2. config.json next to the packaged executable (process.resourcesPath/..).
 //   3. config.json in the project root (development).
 
-const fs = require('fs');
-const path = require('path');
+const fs = require("fs");
+const path = require("path");
 
 const DEFAULTS = {
-  url: 'https://example.com',
-  ndiName: 'HTML to NDI',
+  url: "https://example.com",
+  ndiName: "HTML to NDI",
   width: 1920,
   height: 1080,
   fps: 60,
@@ -28,11 +28,11 @@ function candidatePaths() {
   }
   // Packaged: config.json sits next to the .exe (extraResources -> ../config.json).
   if (process.resourcesPath) {
-    paths.push(path.join(process.resourcesPath, '..', 'config.json'));
-    paths.push(path.join(process.resourcesPath, 'config.json'));
+    paths.push(path.join(process.resourcesPath, "..", "config.json"));
+    paths.push(path.join(process.resourcesPath, "config.json"));
   }
   // Development: project root.
-  paths.push(path.join(__dirname, '..', 'config.json'));
+  paths.push(path.join(__dirname, "..", "config.json"));
   return paths;
 }
 
@@ -41,7 +41,7 @@ function loadConfig() {
   for (const p of candidatePaths()) {
     try {
       if (p && fs.existsSync(p)) {
-        fileConfig = JSON.parse(fs.readFileSync(p, 'utf8'));
+        fileConfig = JSON.parse(fs.readFileSync(p, "utf8"));
         console.log(`[config] Loaded ${p}`);
         break;
       }

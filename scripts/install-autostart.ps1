@@ -57,7 +57,8 @@ Write-Host "Task name      : $TaskName"
 # Build the scheduled task.
 if ($launch.Arguments) {
     $action = New-ScheduledTaskAction -Execute $launch.Program -Argument $launch.Arguments -WorkingDirectory $launch.WorkingDir
-} else {
+}
+else {
     $action = New-ScheduledTaskAction -Execute $launch.Program -WorkingDirectory $launch.WorkingDir
 }
 

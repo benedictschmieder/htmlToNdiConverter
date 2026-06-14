@@ -22,7 +22,7 @@ It supports a transparent background, so pages with alpha render as a true NDI s
 ```
 
 - **Rendering:** Electron's offscreen mode produces a real Chromium render of the page (full JS, CSS animations, WebGL via software) as BGRA pixel buffers.
-- **NDI output:** A small custom C++ N-API addon (`native/ndi_sender.cc`) wraps the official NDI SDK `NDIlib_send_*` API and transmits each frame. (The common Node NDI binding *grandiose* only **receives** NDI, so sending is implemented here directly.)
+- **NDI output:** A small custom C++ N-API addon (`native/ndi_sender.cc`) wraps the official NDI SDK `NDIlib_send_*` API and transmits each frame. (The common Node NDI binding _grandiose_ only **receives** NDI, so sending is implemented here directly.)
 
 ## Requirements
 
@@ -75,16 +75,16 @@ npm run build:native
 
 Edit `config.json`:
 
-| Field                     | Meaning                                                        |
-| ------------------------- | -------------------------------------------------------------- |
-| `url`                     | The web page to render and stream.                             |
-| `ndiName`                 | Name the NDI source appears as on the network.                 |
-| `width`, `height`         | Output resolution in pixels (e.g. 1920 x 1080).                |
-| `fps`                     | Render/output frame rate (1–60).                               |
+| Field                                         | Meaning                                                                              |
+| --------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `url`                                         | The web page to render and stream.                                                   |
+| `ndiName`                                     | Name the NDI source appears as on the network.                                       |
+| `width`, `height`                             | Output resolution in pixels (e.g. 1920 x 1080).                                      |
+| `fps`                                         | Render/output frame rate (1–60).                                                     |
 | `frameRateNumerator` / `frameRateDenominator` | NDI frame rate metadata. 60000/1000 = 60p, 30000/1001 = 29.97p, 60000/1001 = 59.94p. |
-| `transparent`             | `true` to output an alpha channel (for overlays).              |
-| `disableHardwareAcceleration` | Keep `true` for reliable CPU frame capture.                |
-| `reloadOnFailureSeconds`  | Auto-reload delay if the page crashes or fails to load.        |
+| `transparent`                                 | `true` to output an alpha channel (for overlays).                                    |
+| `disableHardwareAcceleration`                 | Keep `true` for reliable CPU frame capture.                                          |
+| `reloadOnFailureSeconds`                      | Auto-reload delay if the page crashes or fails to load.                              |
 
 You can also point the app at a different config file with the `HTML2NDI_CONFIG` environment variable.
 
@@ -115,6 +115,35 @@ Build on the developer PC, then copy the result to the vMix PC — Node.js and t
 3. Ensure the **NDI Runtime** (NDI Tools) is installed on the vMix PC.
 4. Edit `config.json` next to the executable for that machine's URL/resolution.
 5. Test by launching the app and confirming the source appears in NDI Studio Monitor, then set up autostart (below).
+
+## Continuous builds / Releases
+
+A GitHub Actions workflow (`.github/workflows/build-and-release.yml`) compiles
+the native addon and packages the Windows installer automatically.
+
+One-time setup: the CI runner needs the NDI 6 SDK to compile the addon. Add a
+repository secret with a direct download link to the **NDI 6 SDK** Windows
+installer:
+
+- Repo **Settings → Secrets and variables → Actions → New repository secret**
+- Name: `NDI_SDK_URL`
+- Value: the direct `.exe` download URL for the NDI 6 SDK (from
+  https://ndi.video/for-developers/ndi-sdk/)
+
+Then:
+
+- **Publish a release:** push a version tag and the workflow builds the
+  installer and attaches it to a new GitHub Release.
+
+  ```powershell
+  npm version patch      # bumps version and creates a git tag
+  git push --follow-tags
+  ```
+
+  (Or create the tag manually, e.g. `git tag v1.0.0 && git push origin v1.0.0`.)
+
+- **Just build:** trigger the workflow manually from the **Actions** tab
+  (_Run workflow_). The installer is uploaded as a downloadable build artifact.
 
 ## Autostart on boot
 
