@@ -1,7 +1,7 @@
 {
   "name": "html-to-ndi-converter",
   "productName": "HTML to NDI Converter",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Renders a live web page (HTML stream) offscreen and outputs it as an NDI video source for media production and streaming.",
   "main": "src/main.js",
   "author": "",
