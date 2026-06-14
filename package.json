@@ -13,12 +13,12 @@
     "dist": "electron-builder --win"
   },
   "dependencies": {
-    "node-addon-api": "^8.1.0"
+    "node-addon-api": "^8.8.0"
   },
   "devDependencies": {
-    "electron": "^31.3.0",
-    "electron-builder": "^24.13.3",
-    "node-gyp": "^10.2.0"
+    "electron": "^42.4.0",
+    "electron-builder": "^26.15.3",
+    "node-gyp": "^13.0.0"
   },
   "build": {
     "appId": "media.htmltondi.converter",

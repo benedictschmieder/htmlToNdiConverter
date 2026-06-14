@@ -32,7 +32,7 @@ You can **build on one PC and run on another** (recommended for a vMix machine).
 
 Must be **Windows x64** — the native addon links against the Windows NDI SDK and cannot be cross-compiled from macOS/Linux. Install one-time:
 
-1. **Node.js LTS (x64)** — https://nodejs.org
+1. **Node.js 22 LTS or newer (x64)** — https://nodejs.org
 2. **Visual Studio Build Tools** with the **"Desktop development with C++"**
    workload — https://visualstudio.microsoft.com/downloads/
    (needed to compile the native addon)
