@@ -107,10 +107,9 @@ let reloadTimer = null;
 let lastFrame = null; // { data: Buffer, width, height }
 let frameTimer = null;
 
-// Diagnostic counters (reset every stats window).
-let paintCount = 0;
+// Throughput counter (reset every health-log window) and its timer.
 let sendCount = 0;
-let statsTimer = null;
+let healthTimer = null;
 
 // ---------------------------------------------------------------------------
 // Tray icon + status menu.
@@ -229,68 +228,34 @@ function startFrameLoop() {
       console.error("[frame]", err.message);
     }
   }, intervalMs);
-  startStatsLoop();
+  startHealthLoop();
 }
 
-// Once per second, report how many frames were painted by Chromium vs. how many
-// were actually transmitted to NDI. Steady ~config.fps sends with occasional
-// paints is the healthy pattern.
-function startStatsLoop() {
-  if (statsTimer) return;
-  statsTimer = setInterval(() => {
-    const connections =
+// Periodic health line so the log shows, at a glance, that frames are still
+// flowing to NDI and how many receivers are connected. A drop to 0 fps points
+// to a stalled renderer; 0 receivers with frames flowing points to a network or
+// discovery problem on the receiving side.
+function startHealthLoop() {
+  if (healthTimer) return;
+  const windowSecs = 10;
+  healthTimer = setInterval(() => {
+    const fps = Math.round(sendCount / windowSecs);
+    sendCount = 0;
+    if (fps === 0) {
+      console.warn(
+        `[health] no frames sent in last ${windowSecs}s ` +
+          `(lastFrame=${lastFrame ? "present" : "none"})`,
+      );
+      return;
+    }
+    const receivers =
       sender && typeof sender.getConnections === "function"
         ? sender.getConnections()
-        : "n/a";
+        : "?";
     console.log(
-      `[stats] paints=${paintCount}/s sends=${sendCount}/s ` +
-        `size=${senderW}x${senderH} receivers=${connections} ` +
-        `lastFrame=${lastFrame ? "yes" : "none"} ${sampleContent(lastFrame)}`,
+      `[health] ${fps} fps to NDI, receivers=${receivers}, ${senderW}x${senderH}`,
     );
-    paintCount = 0;
-    sendCount = 0;
-  }, 1000);
-}
-
-// Inspect the pixel content of a captured BGRA frame so the log reveals whether
-// the renderer is producing real content or just a uniform/black image.
-function sampleContent(frame) {
-  if (!frame || !frame.data || frame.data.length < 4) return "content=?";
-  const buf = frame.data; // BGRA
-  const w = frame.width;
-  const h = frame.height;
-  const stride = w * 4;
-  let rMin = 255,
-    rMax = 0,
-    gMin = 255,
-    gMax = 0,
-    bMin = 255,
-    bMax = 0;
-  const stepX = w > 64 ? Math.floor(w / 64) : 1;
-  const stepY = h > 64 ? Math.floor(h / 64) : 1;
-  for (let y = 0; y < h; y += stepY) {
-    const rowOff = y * stride;
-    for (let x = 0; x < w; x += stepX) {
-      const o = rowOff + x * 4;
-      const b = buf[o];
-      const g = buf[o + 1];
-      const r = buf[o + 2];
-      if (r < rMin) rMin = r;
-      if (r > rMax) rMax = r;
-      if (g < gMin) gMin = g;
-      if (g > gMax) gMax = g;
-      if (b < bMin) bMin = b;
-      if (b > bMax) bMax = b;
-    }
-  }
-  const uniform = rMin === rMax && gMin === gMax && bMin === bMax;
-  let verdict;
-  if (uniform) {
-    verdict = rMax === 0 ? "BLACK" : `UNIFORM(${rMax},${gMax},${bMax})`;
-  } else {
-    verdict = "CONTENT";
-  }
-  return `content=${verdict} R[${rMin}-${rMax}] G[${gMin}-${gMax}] B[${bMin}-${bMax}]`;
+  }, windowSecs * 1000);
 }
 
 function stopFrameLoop() {
@@ -298,9 +263,9 @@ function stopFrameLoop() {
     clearInterval(frameTimer);
     frameTimer = null;
   }
-  if (statsTimer) {
-    clearInterval(statsTimer);
-    statsTimer = null;
+  if (healthTimer) {
+    clearInterval(healthTimer);
+    healthTimer = null;
   }
 }
 
@@ -349,7 +314,6 @@ function createWindow() {
         width: size.width,
         height: size.height,
       };
-      paintCount++;
     } catch (err) {
       console.error("[paint]", err.message);
     }
