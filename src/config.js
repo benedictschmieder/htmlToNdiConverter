@@ -38,10 +38,13 @@ function candidatePaths() {
 
 function loadConfig() {
   let fileConfig = {};
-  for (const p of candidatePaths()) {
+  let loadedPath = null;
+  const candidates = candidatePaths();
+  for (const p of candidates) {
     try {
       if (p && fs.existsSync(p)) {
         fileConfig = JSON.parse(fs.readFileSync(p, "utf8"));
+        loadedPath = p;
         console.log(`[config] Loaded ${p}`);
         break;
       }
@@ -56,6 +59,10 @@ function loadConfig() {
   merged.width = Math.max(2, Math.round(merged.width));
   merged.height = Math.max(2, Math.round(merged.height));
   merged.fps = Math.min(60, Math.max(1, Math.round(merged.fps)));
+
+  // The config file that was actually loaded, or the most likely place one
+  // should live (next to the packaged exe), so the UI can open it.
+  merged.configPath = loadedPath || candidates[candidates.length - 1] || null;
 
   return merged;
 }

@@ -4,9 +4,46 @@
 // painted frame (BGRA) to the native NDI sender addon, which publishes it as an
 // NDI video source on the network.
 
-const { app, BrowserWindow } = require("electron");
+const {
+  app,
+  BrowserWindow,
+  Tray,
+  Menu,
+  nativeImage,
+  shell,
+} = require("electron");
 const path = require("path");
+const logger = require("./logger");
+
+// Single instance: a second launch must not fight over the NDI name.
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+  process.exit(0);
+}
+
+// Start file logging before anything else so early failures are captured.
+logger.init();
+logger.patchConsole();
+
 const config = require("./config");
+
+// ---------------------------------------------------------------------------
+// Service status (surfaced in the tray).
+// ---------------------------------------------------------------------------
+const status = {
+  state: "starting", // starting | loading | streaming | error
+  detail: "",
+  size: "",
+};
+let tray = null;
+
+// Embedded 32x32 tray icon (blue ring + play glyph) so no binary asset is
+// needed in the package.
+const TRAY_ICON_BASE64 =
+  "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAnElEQVR4nO2UyxGAMAhEqcR6bdQ61HMm" +
+  "CbAs+JkwwxHfy5ogsupLte3HaenHwCkiKDwsMfrgXTJrmogXrImUwkMSLDgswYT3JMqih1KIwmfzqQKW" +
+  "55oiMFtAqQKWDZgi4FnB/0zgNXeg5BUgu2A0a15EkRRaoPv0rBS036MKMCUgOEsiBO8JWEVGc24BTcTa" +
+  "MJghQYEjInTwqsy6ABMbB/igIZVQAAAAAElFTkSuQmCC";
 
 // ---------------------------------------------------------------------------
 // Load the native NDI sender addon.
@@ -62,6 +99,77 @@ let senderW = 0;
 let senderH = 0;
 let reloadTimer = null;
 
+// ---------------------------------------------------------------------------
+// Tray icon + status menu.
+// ---------------------------------------------------------------------------
+function setStatus(state, detail) {
+  status.state = state;
+  if (detail !== undefined) status.detail = detail;
+  updateTray();
+}
+
+function statusLine() {
+  switch (status.state) {
+    case "streaming":
+      return `\u25CF Streaming \u2013 ${config.ndiName}${
+        status.size ? " @ " + status.size : ""
+      }`;
+    case "loading":
+      return "\u25CB Loading page\u2026";
+    case "error":
+      return `\u26A0 Error: ${status.detail || "see log"}`;
+    default:
+      return "\u25CB Starting\u2026";
+  }
+}
+
+function openConfig() {
+  if (config.configPath) {
+    shell.openPath(config.configPath).then((err) => {
+      if (err) console.error("[tray] open config failed:", err);
+    });
+  }
+}
+
+function updateTray() {
+  if (!tray) return;
+  const menu = Menu.buildFromTemplate([
+    { label: statusLine(), enabled: false },
+    { label: `URL: ${config.url}`, enabled: false },
+    { type: "separator" },
+    { label: "Open config.json", click: openConfig },
+    {
+      label: "Open log file",
+      click: () => shell.openPath(logger.getLogFilePath()),
+    },
+    {
+      label: "Open log folder",
+      click: () => shell.showItemInFolder(logger.getLogFilePath()),
+    },
+    { type: "separator" },
+    {
+      label: "Reload page",
+      click: () => {
+        if (win && !win.isDestroyed()) {
+          setStatus("loading");
+          win.loadURL(config.url).catch((e) => scheduleReload(e.message));
+        }
+      },
+    },
+    { label: "Quit", click: () => app.quit() },
+  ]);
+  tray.setToolTip(`HTML to NDI \u2013 ${statusLine()}`);
+  tray.setContextMenu(menu);
+}
+
+function createTray() {
+  const icon = nativeImage.createFromBuffer(
+    Buffer.from(TRAY_ICON_BASE64, "base64"),
+  );
+  tray = new Tray(icon);
+  updateTray();
+}
+
 function ensureSender(width, height) {
   if (sender && width === senderW && height === senderH) {
     return;
@@ -77,16 +185,20 @@ function ensureSender(width, height) {
   sender = new addon.NdiSender(config.ndiName);
   senderW = width;
   senderH = height;
+  status.size = `${width}x${height}`;
+  setStatus("streaming");
   console.log(`[ndi] Source "${config.ndiName}" @ ${width}x${height}`);
 }
 
 function scheduleReload(reason) {
+  setStatus("error", reason);
   if (reloadTimer) return;
   const secs = Math.max(1, config.reloadOnFailureSeconds || 5);
   console.warn(`[reload] ${reason} - retrying in ${secs}s`);
   reloadTimer = setTimeout(() => {
     reloadTimer = null;
     if (win && !win.isDestroyed()) {
+      setStatus("loading");
       win.loadURL(config.url).catch((e) => scheduleReload(e.message));
     }
   }, secs * 1000);
@@ -142,6 +254,14 @@ function createWindow() {
     scheduleReload("renderer unresponsive");
   });
 
+  win.webContents.on("did-finish-load", () => {
+    console.log("[load] page loaded");
+    // Stay in 'loading' until the first frame actually creates the sender;
+    // ensureSender() flips status to 'streaming'.
+    if (status.state === "error") setStatus("loading");
+  });
+
+  setStatus("loading");
   win.loadURL(config.url).catch((e) => scheduleReload(e.message));
 }
 
@@ -150,6 +270,9 @@ app.whenReady().then(() => {
     `[start] URL=${config.url} size=${config.width}x${config.height} ` +
       `fps=${config.fps} transparent=${config.transparent}`,
   );
+  console.log(`[start] log file: ${logger.getLogFilePath()}`);
+  console.log(`[start] config file: ${config.configPath}`);
+  createTray();
   createWindow();
 });
 
@@ -167,9 +290,3 @@ app.on("before-quit", () => {
     sender = null;
   }
 });
-
-// Single instance: a second launch should not fight over the NDI name.
-const gotLock = app.requestSingleInstanceLock();
-if (!gotLock) {
-  app.quit();
-}
