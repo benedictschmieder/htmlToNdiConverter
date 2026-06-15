@@ -15,3 +15,8 @@ ndi-stage/
 # Safety net: never commit a plaintext copy of the NDI SDK.
 NDI 6 SDK/
 NDI 6 SDK.zip
+
+# NDI probe tool build artifacts (source tools/ndi-probe.cc is tracked).
+tools/ndi-probe
+tools/*.png
+tools/*.ppm

@@ -107,6 +107,11 @@ let reloadTimer = null;
 let lastFrame = null; // { data: Buffer, width, height }
 let frameTimer = null;
 
+// Diagnostic counters (reset every stats window).
+let paintCount = 0;
+let sendCount = 0;
+let statsTimer = null;
+
 // ---------------------------------------------------------------------------
 // Tray icon + status menu.
 // ---------------------------------------------------------------------------
@@ -199,12 +204,15 @@ function ensureSender(width, height) {
 }
 
 // Transmit the most recent frame at a steady cadence (config.fps). Sending
-// continuously - rather than only on \"paint\" - means a receiver that selects
-// the source at any time immediately receives the current frame, instead of a
-// stale one left over from the last page change.
+// continuously - rather than only on the 'paint' event - means a receiver that
+// selects the source at any time immediately receives the current frame,
+// instead of a stale one left over from the last page change.
 function startFrameLoop() {
   if (frameTimer) return;
   const intervalMs = Math.max(1, Math.round(1000 / Math.max(1, config.fps)));
+  console.log(
+    `[frame] loop started: target ${config.fps} fps (every ${intervalMs}ms)`,
+  );
   frameTimer = setInterval(() => {
     if (!lastFrame) return;
     try {
@@ -216,16 +224,83 @@ function startFrameLoop() {
         config.frameRateNumerator,
         config.frameRateDenominator,
       );
+      sendCount++;
     } catch (err) {
       console.error("[frame]", err.message);
     }
   }, intervalMs);
+  startStatsLoop();
+}
+
+// Once per second, report how many frames were painted by Chromium vs. how many
+// were actually transmitted to NDI. Steady ~config.fps sends with occasional
+// paints is the healthy pattern.
+function startStatsLoop() {
+  if (statsTimer) return;
+  statsTimer = setInterval(() => {
+    const connections =
+      sender && typeof sender.getConnections === "function"
+        ? sender.getConnections()
+        : "n/a";
+    console.log(
+      `[stats] paints=${paintCount}/s sends=${sendCount}/s ` +
+        `size=${senderW}x${senderH} receivers=${connections} ` +
+        `lastFrame=${lastFrame ? "yes" : "none"} ${sampleContent(lastFrame)}`,
+    );
+    paintCount = 0;
+    sendCount = 0;
+  }, 1000);
+}
+
+// Inspect the pixel content of a captured BGRA frame so the log reveals whether
+// the renderer is producing real content or just a uniform/black image.
+function sampleContent(frame) {
+  if (!frame || !frame.data || frame.data.length < 4) return "content=?";
+  const buf = frame.data; // BGRA
+  const w = frame.width;
+  const h = frame.height;
+  const stride = w * 4;
+  let rMin = 255,
+    rMax = 0,
+    gMin = 255,
+    gMax = 0,
+    bMin = 255,
+    bMax = 0;
+  const stepX = w > 64 ? Math.floor(w / 64) : 1;
+  const stepY = h > 64 ? Math.floor(h / 64) : 1;
+  for (let y = 0; y < h; y += stepY) {
+    const rowOff = y * stride;
+    for (let x = 0; x < w; x += stepX) {
+      const o = rowOff + x * 4;
+      const b = buf[o];
+      const g = buf[o + 1];
+      const r = buf[o + 2];
+      if (r < rMin) rMin = r;
+      if (r > rMax) rMax = r;
+      if (g < gMin) gMin = g;
+      if (g > gMax) gMax = g;
+      if (b < bMin) bMin = b;
+      if (b > bMax) bMax = b;
+    }
+  }
+  const uniform = rMin === rMax && gMin === gMax && bMin === bMax;
+  let verdict;
+  if (uniform) {
+    verdict = rMax === 0 ? "BLACK" : `UNIFORM(${rMax},${gMax},${bMax})`;
+  } else {
+    verdict = "CONTENT";
+  }
+  return `content=${verdict} R[${rMin}-${rMax}] G[${gMin}-${gMax}] B[${bMin}-${bMax}]`;
 }
 
 function stopFrameLoop() {
   if (frameTimer) {
     clearInterval(frameTimer);
     frameTimer = null;
+  }
+  if (statsTimer) {
+    clearInterval(statsTimer);
+    statsTimer = null;
   }
 }
 
@@ -274,6 +349,7 @@ function createWindow() {
         width: size.width,
         height: size.height,
       };
+      paintCount++;
     } catch (err) {
       console.error("[paint]", err.message);
     }
@@ -305,6 +381,9 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  console.log(
+    `[start] HTML to NDI Converter v${app.getVersion()} (electron ${process.versions.electron})`,
+  );
   console.log(
     `[start] URL=${config.url} size=${config.width}x${config.height} ` +
       `fps=${config.fps} transparent=${config.transparent}`,
