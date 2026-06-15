@@ -116,7 +116,6 @@ let configError = null; // last config-parse error message, surfaced in the tray
 let watchedPath = null;
 let reloadDebounce = null;
 
-
 // ---------------------------------------------------------------------------
 // Stream: owns one offscreen window + NDI sender pair plus the timers that keep
 // the source alive. Each configured NDI source gets its own instance.
@@ -188,7 +187,10 @@ class Stream {
   // instead of a stale one left over from the last page change.
   startFrameLoop() {
     if (this.frameTimer) return;
-    const intervalMs = Math.max(1, Math.round(1000 / Math.max(1, this.cfg.fps)));
+    const intervalMs = Math.max(
+      1,
+      Math.round(1000 / Math.max(1, this.cfg.fps)),
+    );
     console.log(
       `[frame] "${this.cfg.ndiName}" loop started: target ${this.cfg.fps} fps (every ${intervalMs}ms)`,
     );
@@ -253,12 +255,16 @@ class Stream {
     this.setStatus("error", reason);
     if (this.reloadTimer || this.destroyed) return;
     const secs = Math.max(1, this.cfg.reloadOnFailureSeconds || 5);
-    console.warn(`[reload] "${this.cfg.ndiName}" ${reason} - retrying in ${secs}s`);
+    console.warn(
+      `[reload] "${this.cfg.ndiName}" ${reason} - retrying in ${secs}s`,
+    );
     this.reloadTimer = setTimeout(() => {
       this.reloadTimer = null;
       if (this.win && !this.win.isDestroyed()) {
         this.setStatus("loading");
-        this.win.loadURL(this.cfg.url).catch((e) => this.scheduleReload(e.message));
+        this.win
+          .loadURL(this.cfg.url)
+          .catch((e) => this.scheduleReload(e.message));
       }
     }, secs * 1000);
   }
@@ -302,9 +308,12 @@ class Stream {
 
     this.startFrameLoop();
 
-    this.win.webContents.on("did-fail-load", (e, code, desc, url, isMainFrame) => {
-      if (isMainFrame) this.scheduleReload(`did-fail-load (${code} ${desc})`);
-    });
+    this.win.webContents.on(
+      "did-fail-load",
+      (e, code, desc, url, isMainFrame) => {
+        if (isMainFrame) this.scheduleReload(`did-fail-load (${code} ${desc})`);
+      },
+    );
 
     this.win.webContents.on("render-process-gone", (e, details) => {
       this.scheduleReload(`render-process-gone (${details.reason})`);
@@ -375,7 +384,10 @@ function updateTray() {
   if (!tray) return;
   const items = [];
   if (configError) {
-    items.push({ label: `\u26A0 Config error \u2013 ${configError}`, enabled: false });
+    items.push({
+      label: `\u26A0 Config error \u2013 ${configError}`,
+      enabled: false,
+    });
     items.push({ type: "separator" });
   } else if (streams.length === 0) {
     items.push({ label: "No streams configured", enabled: false });

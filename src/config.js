@@ -68,14 +68,25 @@ function resolveConfigPath() {
 function sanitizeStream(raw) {
   const s = { ...STREAM_DEFAULTS, ...raw };
   s.width = Math.max(2, Math.round(Number(s.width) || STREAM_DEFAULTS.width));
-  s.height = Math.max(2, Math.round(Number(s.height) || STREAM_DEFAULTS.height));
-  s.fps = Math.min(60, Math.max(1, Math.round(Number(s.fps) || STREAM_DEFAULTS.fps)));
+  s.height = Math.max(
+    2,
+    Math.round(Number(s.height) || STREAM_DEFAULTS.height),
+  );
+  s.fps = Math.min(
+    60,
+    Math.max(1, Math.round(Number(s.fps) || STREAM_DEFAULTS.fps)),
+  );
   s.frameRateNumerator =
-    Math.round(Number(s.frameRateNumerator)) || STREAM_DEFAULTS.frameRateNumerator;
+    Math.round(Number(s.frameRateNumerator)) ||
+    STREAM_DEFAULTS.frameRateNumerator;
   s.frameRateDenominator =
-    Math.round(Number(s.frameRateDenominator)) || STREAM_DEFAULTS.frameRateDenominator;
+    Math.round(Number(s.frameRateDenominator)) ||
+    STREAM_DEFAULTS.frameRateDenominator;
   s.transparent = !!s.transparent;
-  s.reloadOnFailureSeconds = Math.max(1, Math.round(Number(s.reloadOnFailureSeconds) || 5));
+  s.reloadOnFailureSeconds = Math.max(
+    1,
+    Math.round(Number(s.reloadOnFailureSeconds) || 5),
+  );
   s.url = String(s.url);
   s.ndiName = String(s.ndiName);
   return s;
