@@ -42,7 +42,6 @@
       }
     ],
     "win": {
-      "publisherName": "Benedict Schmieder",
       "icon": "assets/icon.ico",
       "target": [
         {
