@@ -15,16 +15,16 @@ You only need the installer (`HTMLtoNDI Setup x.y.z.exe`) from the [Releases pag
 
 **3. Configure** by editing `config.json` next to the exe, then restart the app:
 
-| Field | Meaning |
-| --- | --- |
-| `url` | The web page to render and stream. **The main thing to set.** |
-| `ndiName` | Source name shown in your NDI receiver's source list (e.g. "Scoreboard"). |
-| `width`, `height` | Output resolution in pixels. |
-| `fps` | Frame rate, 1–60. |
-| `frameRateNumerator` / `frameRateDenominator` | NDI frame-rate metadata. 60000/1000 = 60p, 30000/1001 = 29.97p, 60000/1001 = 59.94p. |
-| `transparent` | `true` to output an alpha channel for keyable overlays (the page background must be transparent). |
-| `disableHardwareAcceleration` | Keep `true` for reliable CPU frame capture. |
-| `reloadOnFailureSeconds` | Auto-reload delay if the page crashes or fails to load. |
+| Field                                         | Meaning                                                                                           |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `url`                                         | The web page to render and stream. **The main thing to set.**                                     |
+| `ndiName`                                     | Source name shown in your NDI receiver's source list (e.g. "Scoreboard").                         |
+| `width`, `height`                             | Output resolution in pixels.                                                                      |
+| `fps`                                         | Frame rate, 1–60.                                                                                 |
+| `frameRateNumerator` / `frameRateDenominator` | NDI frame-rate metadata. 60000/1000 = 60p, 30000/1001 = 29.97p, 60000/1001 = 59.94p.              |
+| `transparent`                                 | `true` to output an alpha channel for keyable overlays (the page background must be transparent). |
+| `disableHardwareAcceleration`                 | Keep `true` for reliable CPU frame capture.                                                       |
+| `reloadOnFailureSeconds`                      | Auto-reload delay if the page crashes or fails to load.                                           |
 
 **4. Use it in your NDI receiver** (vMix, OBS with the NDI plugin, TriCaster, Wirecast, etc.) by adding an NDI input and picking the source named after your `ndiName`. (Test first with NDI Studio Monitor from NDI Tools.)
 
