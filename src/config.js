@@ -256,7 +256,11 @@ function writeConfig(model) {
     const value = globalDefaults[key];
     if (value === undefined || value === null || value === "") continue;
     const coerced = coerceField(key, value);
-    if (coerced !== undefined) out[key] = coerced;
+    if (coerced === undefined) continue;
+    // A global default equal to the built-in default is a no-op; skip it so the
+    // file stays minimal (e.g. global "transparent: off" is never written).
+    if (coerced === STREAM_DEFAULTS[key]) continue;
+    out[key] = coerced;
   }
 
   out.streams = (data.streams || []).map((stream) => {

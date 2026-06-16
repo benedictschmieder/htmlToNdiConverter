@@ -289,11 +289,21 @@
         let input;
         if (field.type === "select3") {
           input = document.createElement("select");
-          const opts = [
-            ["", scope === "global" ? "Default" : "Inherit"],
-            ["true", "On"],
-            ["false", "Off"],
-          ];
+          // Global booleans are a plain Off/On toggle (the "off" choice already
+          // is the built-in default, so a separate "default" state would be
+          // redundant). Stream cards add an "Inherit" choice that follows the
+          // global default.
+          const opts =
+            scope === "global"
+              ? [
+                  ["false", "Off"],
+                  ["true", "On"],
+                ]
+              : [
+                  ["", "Inherit"],
+                  ["true", "On"],
+                  ["false", "Off"],
+                ];
           for (const [v, t] of opts) {
             const o = document.createElement("option");
             o.value = v;
@@ -358,15 +368,20 @@
 
       function setField(el, value) {
         const meta = FIELD_BY_KEY[el.dataset.key];
+        if (meta.type === "select3") {
+          const hasInherit = !!el.querySelector('option[value=""]');
+          if (value === undefined || value === null) {
+            el.value = hasInherit ? "" : "false";
+          } else {
+            el.value = value ? "true" : "false";
+          }
+          return;
+        }
         if (value === undefined || value === null) {
           el.value = "";
           return;
         }
-        if (meta.type === "select3") {
-          el.value = value ? "true" : "false";
-        } else {
-          el.value = value;
-        }
+        el.value = value;
       }
 
       // Create a stream card pre-filled with `data`.

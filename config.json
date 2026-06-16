@@ -3,14 +3,7 @@
   "streams": [
     {
       "url": "https://example.com",
-      "ndiName": "Web2NDI",
-      "width": 1920,
-      "height": 1080,
-      "fps": 60,
-      "frameRateNumerator": 60000,
-      "frameRateDenominator": 1000,
-      "transparent": false,
-      "reloadOnFailureSeconds": 5
+      "ndiName": "Web2NDI"
     }
   ]
 }
