@@ -1,7 +1,7 @@
 {
   "name": "web2ndi",
   "productName": "Web2NDI",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "description": "Renders a live web page (HTML stream) offscreen and outputs it as an NDI video source for media production and streaming.",
   "main": "src/main.js",
   "author": "Benedict Schmieder",
