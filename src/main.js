@@ -473,7 +473,13 @@ function updateTray() {
     label: "Start automatically at logon",
     type: "checkbox",
     checked: isAutoStartEnabled(),
-    click: (item) => setAutoStart(item.checked),
+    click: (item) => {
+      setAutoStart(item.checked);
+      // Windows tray menus dismiss on any click, which feels wrong for a
+      // toggle. Re-open the (rebuilt) menu so flipping this switch keeps the
+      // menu visible instead of closing it.
+      if (tray) setTimeout(() => tray.popUpContextMenu(), 0);
+    },
   });
   items.push({ label: "Quit", click: () => app.quit() });
 
