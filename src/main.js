@@ -537,10 +537,7 @@ function updateTray() {
     checked: isAutoStartEnabled(),
     click: (item) => {
       setAutoStart(item.checked);
-      // Windows tray menus dismiss on any click, which feels wrong for a
-      // toggle. Re-open the (rebuilt) menu so flipping this switch keeps the
-      // menu visible instead of closing it.
-      if (tray) setTimeout(() => tray.popUpContextMenu(), 0);
+      // The menu closes after this click, which is the native tray behaviour.
     },
   });
   items.push({ label: "Quit", click: () => app.quit() });
