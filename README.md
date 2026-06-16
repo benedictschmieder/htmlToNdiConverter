@@ -19,7 +19,7 @@ You only need the installer (`Web2NDI Setup x.y.z.exe`) from the [Releases page]
 
 **2. Run the installer.** It's a one-click per-user installer (no admin needed) and launches automatically. It installs to `C:\Users\<you>\AppData\Local\Programs\Web2NDI\`, with `Web2NDI.exe` and `config.json` side by side in that folder.
 
-**3. Configure** by editing `config.json` next to the exe. **Changes are applied automatically** — the app watches the file and reloads its streams a moment after you save, no restart needed (the only exception is `disableHardwareAcceleration`, which needs a restart).
+**3. Configure** either with the built-in editor — right-click the tray icon and choose **"Edit configuration…"** for a form with global defaults and one card per stream — or by editing `config.json` next to the exe directly. **Changes are applied automatically** — the app watches the file and reloads its streams a moment after you save, no restart needed (the only exception is `disableHardwareAcceleration`, which needs a restart).
 
 | Field                                         | Meaning                                                                                              |
 | --------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
@@ -55,7 +55,7 @@ You only need the installer (`Web2NDI Setup x.y.z.exe`) from the [Releases page]
 
 **4. Use it in your NDI receiver** (vMix, OBS with the NDI plugin, TriCaster, Wirecast, etc.) by adding an NDI input and picking the source named after your `ndiName`. (Test first with NDI Studio Monitor from NDI Tools.)
 
-**5. Check status & logs.** The app runs in the background with a **system-tray icon**. Right-click it to see the live per-stream status (Streaming / Loading / Error), open `config.json`, open a **live log viewer** window (real-time log with filter, wrap and autoscroll), or open the log file. The log is the first place to look if no NDI source appears — it records each stream's URL, resolution, page load result, and any NDI errors.
+**5. Check status & logs.** The app runs in the background with a **system-tray icon**. Right-click it to see the live per-stream status (Streaming / Loading / Error), open the **configuration editor** or `config.json`, open a **live log viewer** window (real-time log with filter, wrap and autoscroll), or open the log file. The log is the first place to look if no NDI source appears — it records each stream's URL, resolution, page load result, and any NDI errors.
 
 **6. Autostart on boot (optional)** so it runs unattended. Right-click the tray icon and tick **"Start automatically at logon"**. This adds a per-user entry that launches the app when you sign in (untick to remove it); no admin rights, scripts, or scheduled tasks needed. For fully unattended operation, also enable automatic Windows logon for the production user.
 

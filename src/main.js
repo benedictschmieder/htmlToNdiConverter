@@ -10,7 +10,7 @@ const {
   Tray,
   Menu,
   nativeImage,
-  shell,
+  ipcMain,
 } = require("electron");
 const path = require("path");
 const fs = require("fs");
@@ -26,7 +26,12 @@ if (!app.requestSingleInstanceLock()) {
 logger.init();
 logger.patchConsole();
 
-const { loadConfig, resolveConfigPath } = require("./config");
+const {
+  loadConfig,
+  loadRawConfig,
+  writeConfig,
+  resolveConfigPath,
+} = require("./config");
 
 // ---------------------------------------------------------------------------
 // State.
@@ -112,6 +117,7 @@ let configError = null; // last config-parse error message, surfaced in the tray
 let watchedPath = null;
 let reloadDebounce = null;
 let logWin = null; // the live log viewer window, if open
+let configWin = null; // the config editor window, if open
 
 // ---------------------------------------------------------------------------
 // Stream: owns one offscreen window + NDI sender pair plus the timers that keep
@@ -361,13 +367,77 @@ class Stream {
 // ---------------------------------------------------------------------------
 // Tray icon + status menu.
 // ---------------------------------------------------------------------------
-function openConfig() {
-  const p = appConfig && appConfig.configPath;
-  if (p) {
-    shell.openPath(p).then((err) => {
-      if (err) console.error("[tray] open config failed:", err);
-    });
+
+// Editable GUI for config.json. The renderer never touches the file directly;
+// it talks to the main process over IPC (config:load / config:save), which owns
+// all file access. Saving writes the canonical config and the existing file
+// watcher live-reloads the running streams.
+function openConfigEditor() {
+  if (configWin && !configWin.isDestroyed()) {
+    if (configWin.isMinimized()) configWin.restore();
+    configWin.show();
+    configWin.focus();
+    return;
   }
+
+  configWin = new BrowserWindow({
+    width: 820,
+    height: 720,
+    title: "Web2NDI \u2013 Configuration",
+    backgroundColor: "#1e1e1e",
+    autoHideMenuBar: true,
+    webPreferences: {
+      preload: path.join(__dirname, "config-editor-preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  configWin.setMenuBarVisibility(false);
+
+  configWin.on("closed", () => {
+    configWin = null;
+  });
+
+  configWin.loadFile(path.join(__dirname, "config-editor.html"));
+}
+
+// IPC backing the config editor. Registered once at startup.
+function registerConfigIpc() {
+  ipcMain.handle("config:load", () => {
+    try {
+      return loadRawConfig();
+    } catch (err) {
+      // Surface a parse error so the editor can offer a clean start instead of
+      // silently overwriting a file the user may still want to fix by hand.
+      return {
+        error: err.message,
+        configPath: resolveConfigPath(),
+        builtInDefaults: require("./config").STREAM_DEFAULTS,
+      };
+    }
+  });
+
+  ipcMain.handle("config:save", (_e, model) => {
+    try {
+      if (!model || !Array.isArray(model.streams) || model.streams.length === 0) {
+        return { ok: false, error: "At least one stream is required." };
+      }
+      for (const s of model.streams) {
+        if (!s || !String(s.url || "").trim()) {
+          return { ok: false, error: "Every stream needs a URL." };
+        }
+        if (!String(s.ndiName || "").trim()) {
+          return { ok: false, error: "Every stream needs an NDI name." };
+        }
+      }
+      const target = writeConfig(model);
+      console.log(`[config] saved from editor: ${target}`);
+      return { ok: true, path: target };
+    } catch (err) {
+      console.error("[config] save failed:", err);
+      return { ok: false, error: err.message };
+    }
+  });
 }
 
 // Autostart is managed through Electron's login-item API, which on Windows
@@ -458,16 +528,8 @@ function updateTray() {
     items.push({ label: `    ${s.cfg.url}`, enabled: false });
   });
   if (streams.length > 0) items.push({ type: "separator" });
-  items.push({ label: "Open config.json", click: openConfig });
+  items.push({ label: "Edit configuration\u2026", click: openConfigEditor });
   items.push({ label: "Open log viewer", click: openLogViewer });
-  items.push({
-    label: "Open log file",
-    click: () => shell.openPath(logger.getLogFilePath()),
-  });
-  items.push({
-    label: "Open log folder",
-    click: () => shell.showItemInFolder(logger.getLogFilePath()),
-  });
   items.push({ type: "separator" });
   items.push({
     label: "Start automatically at logon",
@@ -579,6 +641,7 @@ app.whenReady().then(() => {
   console.log(`[start] log file: ${logger.getLogFilePath()}`);
   console.log(`[start] config file: ${appConfig.configPath}`);
   if (configError) console.warn(`[start] config error: ${configError}`);
+  registerConfigIpc();
   createTray();
   startStreams(appConfig);
   startConfigWatch();

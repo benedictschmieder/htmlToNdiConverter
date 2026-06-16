@@ -159,4 +159,134 @@ function loadConfig() {
   return { configPath, disableHardwareAcceleration, streams };
 }
 
-module.exports = { loadConfig, resolveConfigPath };
+// Per-stream keys that do not make sense as a shared/global default. Each stream
+// needs its own URL, and NDI source names must be unique on the network.
+const PER_STREAM_ONLY_KEYS = ["url", "ndiName"];
+
+// Keys that may be set as a global default for every stream.
+const SHARED_STREAM_KEYS = Object.keys(STREAM_DEFAULTS).filter(
+  (k) => !PER_STREAM_ONLY_KEYS.includes(k),
+);
+
+// Coerce a raw value to the type implied by STREAM_DEFAULTS for that key.
+function coerceField(key, value) {
+  const type = typeof STREAM_DEFAULTS[key];
+  if (type === "number") {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : undefined;
+  }
+  if (type === "boolean") return !!value;
+  return value === undefined || value === null ? undefined : String(value);
+}
+
+// Keep only the known stream keys from a raw object (drops anything the editor
+// and app do not understand).
+function pickStreamKeys(obj) {
+  const out = {};
+  if (!obj || typeof obj !== "object") return out;
+  for (const key of Object.keys(STREAM_DEFAULTS)) {
+    if (obj[key] !== undefined) out[key] = obj[key];
+  }
+  return out;
+}
+
+// Read the config file WITHOUT applying defaults, so the editor can distinguish
+// values that were explicitly set from values that are merely inherited. The
+// result is split into the app option, the explicit global defaults, the raw
+// per-stream overrides, and the built-in defaults used for placeholders.
+//
+// Throws on JSON parse errors so the caller can surface "the current file is
+// invalid" rather than silently overwriting it.
+function loadRawConfig() {
+  const configPath = resolveConfigPath();
+  let raw = {};
+  if (configPath && fs.existsSync(configPath)) {
+    raw = JSON.parse(fs.readFileSync(configPath, "utf8"));
+  }
+
+  let appOptions;
+  let rawStreams;
+  let globalDefaults = {};
+  if (Array.isArray(raw)) {
+    appOptions = {};
+    rawStreams = raw;
+  } else if (raw && Array.isArray(raw.streams)) {
+    const { streams, ...rest } = raw;
+    appOptions = rest;
+    rawStreams = streams;
+    globalDefaults = pickStreamKeys(rest);
+  } else {
+    // Flat single-stream object: it is one stream that may also carry app keys.
+    appOptions = raw || {};
+    rawStreams = [appOptions];
+  }
+  // url/ndiName are never global defaults, even in the {streams:[]} form.
+  for (const key of PER_STREAM_ONLY_KEYS) delete globalDefaults[key];
+
+  const disableHardwareAcceleration =
+    appOptions.disableHardwareAcceleration !== undefined
+      ? !!appOptions.disableHardwareAcceleration
+      : APP_DEFAULTS.disableHardwareAcceleration;
+
+  const streams = rawStreams
+    .filter((s) => s && typeof s === "object" && !Array.isArray(s))
+    .map(pickStreamKeys);
+
+  return {
+    configPath,
+    disableHardwareAcceleration,
+    globalDefaults,
+    streams,
+    builtInDefaults: STREAM_DEFAULTS,
+  };
+}
+
+// Write a config object in the canonical `{streams:[]}` shape: app option +
+// explicit global defaults at the top level, then a streams array where each
+// stream carries only url, ndiName, and the fields it overrides. Empty/blank
+// values are omitted so they fall back to the global default (or built-in).
+function writeConfig(model) {
+  const data = model || {};
+  const out = {
+    disableHardwareAcceleration: !!data.disableHardwareAcceleration,
+  };
+
+  const globalDefaults = data.globalDefaults || {};
+  for (const key of SHARED_STREAM_KEYS) {
+    const value = globalDefaults[key];
+    if (value === undefined || value === null || value === "") continue;
+    const coerced = coerceField(key, value);
+    if (coerced !== undefined) out[key] = coerced;
+  }
+
+  out.streams = (data.streams || []).map((stream) => {
+    const s = stream || {};
+    const obj = {
+      url: String(s.url == null ? "" : s.url),
+      ndiName: String(s.ndiName == null ? "" : s.ndiName),
+    };
+    for (const key of SHARED_STREAM_KEYS) {
+      const value = s[key];
+      if (value === undefined || value === null || value === "") continue;
+      const coerced = coerceField(key, value);
+      if (coerced !== undefined) obj[key] = coerced;
+    }
+    return obj;
+  });
+
+  const target = resolveConfigPath();
+  fs.writeFileSync(target, JSON.stringify(out, null, 2) + "\n", "utf8");
+  return target;
+}
+
+module.exports = {
+  loadConfig,
+  loadRawConfig,
+  writeConfig,
+  resolveConfigPath,
+  sanitizeStream,
+  STREAM_DEFAULTS,
+  APP_DEFAULTS,
+  SHARED_STREAM_KEYS,
+  PER_STREAM_ONLY_KEYS,
+};
